@@ -1,0 +1,16 @@
+{
+  "name": "@one.chat/conversation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/app.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@one.chat/shared": "file:../shared"
+  }
+}

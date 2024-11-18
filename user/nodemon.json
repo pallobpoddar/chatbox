@@ -1,0 +1,11 @@
+{
+    "watch": [
+      "user"
+    ],
+    "ignore": [
+      "./node_modules",
+      "./shared/dist/"
+    ],
+    "ext": "js,ts,json",
+    "exec": "ts-node ./user/src/app.ts"
+  }

@@ -1,0 +1,11 @@
+{
+  "realm": "dream-emirates",
+  "auth-server-url": "https://accounts.bitnix.ai/",
+  "ssl-required": "external",
+  "resource": "chat-dreamemirates",
+  "verify-token-audience": false,
+  "credentials": {
+    "secret": "vunRICxYWjc7nVjSqfhzFTWQvUKac8mi"
+  },
+  "confidential-port": 0
+}

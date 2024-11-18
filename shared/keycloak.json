@@ -1,0 +1,13 @@
+{
+  "initOptions": {
+    "baseUrl": "https://accounts.bitnix.ai",
+    "realmName": "master"
+  },
+  "loginDetails": {
+    "username": "sislamrafi",
+    "password": "admin123",
+    "grantType": "password",
+    "clientId": "admin-cli"
+  },
+  "workingRealm": "dream-emirates"
+}

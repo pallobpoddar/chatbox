@@ -1,0 +1,6 @@
+{
+  "watch": ["socket-server", "shared"],
+  "ignore": ["./node_modules", "./shared/dist/"],
+  "ext": "js,ts,json",
+  "exec": "npm run build:shared && ts-node ./socket-server/src/app.ts"
+}

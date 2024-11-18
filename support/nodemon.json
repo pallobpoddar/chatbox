@@ -1,0 +1,6 @@
+{
+  "watch": ["support", "shared"],
+  "ignore": ["./node_modules", "./shared/dist/"],
+  "ext": "js,ts,json",
+  "exec": "npm run build:shared && ts-node ./support/src/app.ts"
+}
