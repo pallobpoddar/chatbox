@@ -418,9 +418,6 @@ class conversation {
           participantId
         );
 
-        console.log(totalItems);
-        
-
       // Format the result into pagination response
       const paginatedResponse = ResultToPagination(totalItems, pagination);
       return ApiResponse.success(

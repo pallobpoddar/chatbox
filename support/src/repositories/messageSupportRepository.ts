@@ -6,7 +6,7 @@ import {
 } from "../models/interfaces/inboxChunkSupport";
 import InboxChunkSupportModel from "../models/inboxChunkSupport";
 import DistributionModel from "@one.chat/shared/dist/models/distribution";
-import {IDistribution} from "@one.chat/shared/dist/models/interfaces/distribution";
+import { IDistribution } from "@one.chat/shared/dist/models/interfaces/distribution";
 import ConversationModel from "@one.chat/shared/dist/models/conversations";
 import { IEventActionPayload } from "@one.chat/shared/dist/utils/EventAction";
 import mongoose from "mongoose";
@@ -110,20 +110,178 @@ class MessageSupportRepository {
     return response as any;
   }
 
-  public async getConversationsByIds(
-    conversationIds: mongoose.Types.ObjectId[]
-  ): Promise<IConversation[]> {
+  public async getAllConversationsByManagerId(
+    offset: number,
+    take: number
+  ): Promise<any> {
+    const managers = await ManagerModel.find({
+      "managers.id": this.tokenContent.sub,
+    });
+    if (managers.length === 0) {
+      throw { status: 404, message: "Manager not found" };
+    }
+
+    const userIds = managers.map((manager) => manager.userId);
+    const supportManagerIds = managers
+      .map((manager) =>
+        manager.managers.map((supportManager) => supportManager.id)
+      )
+      .flat();
+
+    const lastConversations = await ConversationModel.aggregate([
+      {
+        $addFields: {
+          lastMessageTime: { $toDate: "$lastMessageTime" },
+        },
+      },
+      {
+        $match: {
+          "participants.id": { $in: userIds },
+        },
+      },
+      {
+        $match: {
+          $expr: {
+            $allElementsTrue: {
+              $map: {
+                input: "$participants",
+                as: "participant",
+                in: {
+                  $or: [
+                    {
+                      $lt: ["$$participant.lastDeleteTime", "$lastMessageTime"],
+                    },
+                    {
+                      $not: {
+                        $ifNull: ["$$participant.lastDeleteTime", false],
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+      {
+        $sort: { lastMessageTime: -1 },
+      },
+      {
+        $skip: offset,
+      },
+      {
+        $limit: take,
+      },
+    ]);
+
+    // Always returns the boss at the top
+    lastConversations.map((conversation) => {
+      const matchedParticipants = conversation.participants.filter(
+        (participant: {
+          id: string;
+          isAdmin?: boolean;
+          info?: {
+            delivered: number;
+            seen: number;
+          };
+          lastDeleteTime?: Date;
+        }) => userIds.includes(participant.id)
+      );
+
+      const unmatchedParticipants = conversation.participants.filter(
+        (participant: {
+          id: string;
+          isAdmin?: boolean;
+          info?: {
+            delivered: number;
+            seen: number;
+          };
+          lastDeleteTime?: Date;
+        }) => !userIds.includes(participant.id)
+      );
+
+      conversation.participants = [
+        ...matchedParticipants,
+        ...unmatchedParticipants,
+      ];
+    });
+
+    const conversationIds = lastConversations.map(
+      (conversation) => conversation._id
+    );
+    const distributions = await DistributionModel.find({
+      userId: { $in: supportManagerIds },
+      "assigns.conversationId": { $in: conversationIds },
+    });
+
+    const pendingAssigns = await PendingAssignModel.find({
+      participantId: { $in: userIds },
+      "conversations.id": { $in: conversationIds },
+    });
+
+    const lastSupportConversations = lastConversations.map((conversation) => {
+      const conversationId = conversation._id.toString();
+
+      let status;
+      let assignee;
+      const assignedDistribution = distributions.find((d) =>
+        d.assigns.some((a) => a.conversationId.toString() === conversationId)
+      );
+      const isPending = pendingAssigns.some((p) =>
+        p.conversations.some((c) => c.id.toString() === conversationId)
+      );
+
+      if (assignedDistribution) {
+        status = "Assigned";
+        assignee = assignedDistribution?.userId || null;
+      } else if (isPending) {
+        status = "Not Assigned";
+        assignee = null;
+      } else {
+        status = "Closed";
+        assignee = null;
+      }
+
+      const userPart = {
+        conversation: conversation,
+      };
+
+      const agentPart = {
+        status: status,
+        assignee: assignee,
+      };
+
+      return {
+        userPart,
+        agentPart,
+      };
+    });
+
+    return lastSupportConversations;
+  }
+
+  public async getConversationsByIds(): Promise<IConversation[] | null> {
     const distribution = await DistributionModel.findOne({
       userId: this.tokenContent.sub,
     });
+    // if (!distribution) {
+    //   throw { status: 404, message: "Distribution not found" };
+    // }
+
+    // const distributionConversations = distribution.assigns.filter(
+    //   (conversation) => conversationIds.includes(conversation.conversationId)
+    // );
+
     if (!distribution) {
-      throw { status: 404, message: "Distribution not found" };
+      return null;
     }
 
-    const distributionConversations = distribution.assigns.filter(conversation => conversationIds.includes(conversation.conversationId));
+    const conversationIds = distribution?.assigns.map(
+      (conversation) => conversation.conversationId
+    );
 
     const conversations = await ConversationModel.find({
-      _id: { $in: distributionConversations },
+      _id: { $in: conversationIds },
     });
 
     return conversations;
@@ -138,18 +296,13 @@ class MessageSupportRepository {
       throw { status: 404, message: "Conversation not found" };
     }
 
-    const targetParticipant = targetConversation?.participants.find(
-      (participant) =>
-        participant.lastDeleteTime !== null &&
-        participant.id === this.tokenContent.sub
-    );
-
     const lastInboxChunks = await InboxChunkSupportModel.find({
       conversationId: conversationId,
     })
       .sort({ chunkSerial: -1 })
       .skip(page)
-      .limit(2);
+      .limit(2)
+      .lean();
 
     return lastInboxChunks;
   }

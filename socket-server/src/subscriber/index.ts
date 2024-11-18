@@ -1,6 +1,10 @@
 import Redis from "ioredis";
 
-export const subscribe_channels = ["conversations", "distribution:outgoing"];
+export const subscribe_channels = [
+  "conversations",
+  "distribution:outgoing",
+  "support-conversations",
+];
 
 export async function initSubscriber(redisClient: Redis) {
   redisClient.subscribe(...subscribe_channels, (err, count) => {

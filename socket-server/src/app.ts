@@ -18,7 +18,14 @@ async function initServer() {
   const keycloakConfigPath = path.resolve(__dirname, "../", "keycloak.json");
   const keycloak = new Keycloak({ store: memoryStore }, keycloakConfigPath);
   // Create a new Socket.IO server instance
-  const io = new Server();
+  const io = new Server({
+    cors: {
+      origin: "*", // Allow all origins
+      methods: ["GET", "POST"], // Allowed methods
+      allowedHeaders: ["Authorization"], // Allowed headers if needed
+      credentials: true, // Allow credentials
+    },
+  });
   // Initialize the Socket.IO namespaces
   const { chat_namespace, support_namespace } = initSocketNamespaces(
     io,
@@ -37,6 +44,12 @@ async function initServer() {
     //conversation channel handler
     redisPubSubController.conversationChannelHandler(
       chat_namespace,
+      channel,
+      message
+    );
+
+    redisPubSubController.supportConversationChannelHandler(
+      support_namespace,
       channel,
       message
     );

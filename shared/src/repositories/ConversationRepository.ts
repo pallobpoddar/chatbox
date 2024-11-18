@@ -109,9 +109,9 @@ class ConversationRepository {
     offset: number,
     take: number
   ): Promise<IConversation[]> {
-    if (participantId !== this.tokenContent.sub) {
-      throw { status: 403, message: "Permission denied" };
-    }
+    // if (participantId !== this.tokenContent.sub) {
+    //   throw { status: 403, message: "Permission denied" };
+    // }
 
     const lastConversations = await ConversationModel.aggregate([
       {
@@ -122,24 +122,34 @@ class ConversationRepository {
       {
         $match: {
           $expr: {
-            $allElementsTrue: {
-              $map: {
-                input: "$participants",
-                as: "participant",
-                in: {
-                  $or: [
-                    {
-                      $lt: ["$$participant.lastDeleteTime", "$lastMessageTime"],
+            $and: [
+              {
+                $in: [participantId, "$participants.id"],
+              },
+              {
+                $allElementsTrue: {
+                  $map: {
+                    input: "$participants",
+                    as: "participant",
+                    in: {
+                      $or: [
+                        {
+                          $lt: [
+                            "$$participant.lastDeleteTime",
+                            "$lastMessageTime",
+                          ],
+                        },
+                        {
+                          $not: {
+                            $ifNull: ["$$participant.lastDeleteTime", false],
+                          },
+                        },
+                      ],
                     },
-                    {
-                      $not: {
-                        $ifNull: ["$$participant.lastDeleteTime", false],
-                      },
-                    },
-                  ],
+                  },
                 },
               },
-            },
+            ],
           },
           participants: {
             $elemMatch: { id: participantId }, // New check to ensure participantId is among participants
@@ -377,9 +387,11 @@ class ConversationRepository {
     return updatedConversation;
   }
 
-  public async getTotalConversationsCount(participantId: string): Promise<number> {
+  public async getTotalConversationsCount(
+    participantId: string
+  ): Promise<number> {
     const totalCount = await ConversationModel.countDocuments({
-      participants: { $elemMatch: { id: participantId } }
+      participants: { $elemMatch: { id: participantId } },
     });
     return totalCount;
   }

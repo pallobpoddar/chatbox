@@ -11,6 +11,8 @@ import {
 import User from "@one.chat/shared/dist/models/users";
 import { UserRepository } from "@one.chat/shared/dist/repositories/UserRepository";
 import { SortParamsDecoder, FilterParamsDecoder } from "../utils/ParamsDecoder";
+import { TRADE_APP_URL, TRADE_APP_EMAIL, TRADE_APP_PASSWORD } from "../config/config";
+import axios from "axios";
 
 export class UserController {
   private metadata = generateMetadata("1.0.0", "user");
@@ -136,6 +138,29 @@ export class UserController {
       return ApiResponse.success(res, { user }, "Password reset successfully", undefined, this.metadata);
     } catch (error: any) {
       return ApiResponse.error(res, error.message, error.status ?? 500, error.errors, this.metadata);
+    }
+  }
+
+  async tradeToken(req: express.Request, res: express.Response) {
+    try {
+
+      const email=TRADE_APP_EMAIL?.toString()
+      const password=TRADE_APP_PASSWORD?.toString()
+      // Extract email and password from the request body
+      // Make the axios POST request to send the email and password in the body
+      const response = await axios.post(TRADE_APP_URL as string, {
+        email, // send the email
+        password // send the password
+      });
+
+      const Trade_token= response.data.data.accessToken
+
+      // Pass the axios response data to the success method
+      return ApiResponse.success(res, {Trade_token}, "Request successful", undefined, this.metadata);
+    } catch (error: any) {
+      console.log("error", error)
+      // Handle errors and send an error response
+      return ApiResponse.error(res, error.message, error.response?.status ?? 500, error.response?.data?.errors, this.metadata);
     }
   }
 }

@@ -61,6 +61,7 @@ export default interface IMessage {
       photo: string;
     };
     totalMessages: number;
+    supportParticipants: string[];
     createdAt: {
       $date: Date;
     };

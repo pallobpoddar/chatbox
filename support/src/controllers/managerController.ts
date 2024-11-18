@@ -5,9 +5,16 @@ import {
 import ManagerRepository from "@one.chat/shared/dist/repositories/ManagerRepository";
 import { Request, Response } from "express";
 import { ValidationErrorFormatter } from "../utils/ErrorFormatter";
-import managerValidator from "../validators/managerValidator";
-import {QueryToPagination, ResultToPagination, SortParamsDecoder, FilterParamsDecoder} from "@one.chat/shared/dist/utils/ParamDecoder"
-
+import {
+  managerValidator,
+  addManagersValidator,
+} from "../validators/managerValidator";
+import {
+  QueryToPagination,
+  ResultToPagination,
+  SortParamsDecoder,
+  FilterParamsDecoder,
+} from "@one.chat/shared/dist/utils/ParamDecoder";
 
 class ManagerController {
   private metadata = generateMetadata("1.0.0", "manager");
@@ -49,9 +56,11 @@ class ManagerController {
 
   async createManagerWithUserId(req: Request, res: Response) {
     try {
-      const userId=req.params.userId
+      const userId = req.params.userId;
 
-      const manager = await this.managerRepository.createManagerWithUserId(userId);
+      const manager = await this.managerRepository.createManagerWithUserId(
+        userId
+      );
 
       return ApiResponse.success(
         res,
@@ -101,11 +110,11 @@ class ManagerController {
     try {
       // Extract pagination parameters from the query
       const pagination = QueryToPagination(req.query);
-  
+
       // Decode filters and sort parameters
       const filters = FilterParamsDecoder(req.query?.filters as string);
       const sort = SortParamsDecoder(req.query?.sort as string);
-  
+
       // Fetch managers from the repository with filters, sorting, and pagination
       const managers = await this.managerRepository.getAllManagers(
         filters,
@@ -113,13 +122,13 @@ class ManagerController {
         pagination.request.skip,
         pagination.request.limit
       );
-  
+
       // Get the total count of managers that match the filters for pagination
       const totalItems = await this.managerRepository.getManagerCount(filters);
-  
+
       // Format the result into pagination response
       const paginatedResponse = ResultToPagination(totalItems, pagination);
-  
+
       return ApiResponse.success(
         res,
         { managers },
@@ -140,19 +149,19 @@ class ManagerController {
 
   async addManagers(req: Request, res: Response) {
     try {
-      ValidationErrorFormatter(managerValidator.validate(req.body));
+      // ValidationErrorFormatter(addManagersValidator.validate(req.body));
+      const { businessIds, supportManagerId, role } = req.body;
 
-      const authInfo = req.kauth?.grant?.access_token as any;
-      const token = authInfo?.content;
-      this.setTokenContent(token);
-      const { managers } = req.body;
-
-      const manager = await this.managerRepository.addManagers(managers);
+      const manager = await this.managerRepository.addManagers(
+        businessIds,
+        supportManagerId,
+        role
+      );
 
       return ApiResponse.success(
         res,
         { manager },
-        "Managers added successfully",
+        "Support managers added successfully",
         undefined,
         this.metadata
       );
@@ -174,7 +183,10 @@ class ManagerController {
       const owner = req.params.ownerId;
       const { managers } = req.body;
 
-      const manager = await this.managerRepository.addManagersByOwnerId( owner,managers);
+      const manager = await this.managerRepository.addManagersByOwnerId(
+        owner,
+        managers
+      );
 
       return ApiResponse.success(
         res,

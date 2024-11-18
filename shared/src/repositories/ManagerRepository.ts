@@ -1,6 +1,8 @@
 import { Redis } from "ioredis";
 import { IManager } from "../models/interfaces/manager";
 import ManagerModel from "../models/managers";
+import { UUID } from "crypto";
+import mongoose from "mongoose";
 
 class ManagerRepository {
   private redisClient;
@@ -15,25 +17,26 @@ class ManagerRepository {
   }
 
   public async createManager(): Promise<IManager> {
-    const targetManager = await ManagerModel.findOne({
+    const existingBusinesses = await ManagerModel.findOne({
       userId: this.tokenContent.sub,
     });
-    if (targetManager) {
+    if (existingBusinesses) {
       throw { status: 409, message: "Manager already exists" };
     }
 
     const newManager = await ManagerModel.create({
       userId: this.tokenContent.sub,
+      managers: [{ id: this.tokenContent.sub, role: "supervisor" }],
     });
 
     return newManager;
   }
 
   public async createManagerWithUserId(userId: string): Promise<IManager> {
-    const targetManager = await ManagerModel.findOne({
+    const existingBusinesses = await ManagerModel.findOne({
       userId: userId,
     });
-    if (targetManager) {
+    if (existingBusinesses) {
       throw { status: 409, message: "Manager already exists" };
     }
 
@@ -45,14 +48,14 @@ class ManagerRepository {
   }
 
   public async getManager(): Promise<IManager | null> {
-    const targetManager = await ManagerModel.findOne({
+    const existingBusinesses = await ManagerModel.findOne({
       userId: this.tokenContent.sub,
     });
-    if (!targetManager) {
+    if (!existingBusinesses) {
       throw { status: 404, message: "Manager not found" };
     }
 
-    return targetManager;
+    return existingBusinesses;
   }
 
   public async getAllManagers(
@@ -65,57 +68,59 @@ class ManagerRepository {
       .sort(sort)
       .skip(skip)
       .limit(limit);
-  
+
     if (!targetManagers || targetManagers.length === 0) {
       throw { status: 404, message: "Managers not found" };
     }
-  
+
     return targetManagers;
   }
-  
+
   // Add a method to count the total number of managers for pagination
   public async getManagerCount(filters: any): Promise<number> {
     return ManagerModel.countDocuments(filters);
   }
 
   public async addManagers(
-    managers: { id: string; role?: string }[]
-  ): Promise<IManager | null> {
-    const targetManager = await ManagerModel.findOne({
-      userId: this.tokenContent.sub,
+    businessIds: UUID[],
+    supportManagerId: UUID,
+    role: "agent" | "supervisor"
+  ): Promise<IManager[]> {
+    await ManagerModel.updateMany(
+      {
+        userId: { $in: businessIds },
+        "managers.id": { $ne: supportManagerId },
+      },
+      {
+        $addToSet: {
+          managers: { id: supportManagerId, role: role },
+        },
+      }
+    );
+
+    const updatedBusinesses = await ManagerModel.find({
+      userId: { $in: businessIds },
+      "managers.id": supportManagerId,
     });
-    if (!targetManager) {
-      throw { status: 404, message: "Manager not found" };
+    if (updatedBusinesses.length === 0) {
+      throw { status: 404, message: "No business is found" };
     }
 
-    const existingManagerIds = targetManager.managers.map(
-      (manager) => manager.id
-    );
-    const newManagers = managers.filter(
-      (manager) => !existingManagerIds.includes(manager.id)
-    );
-
-    const updatedManager = await ManagerModel.findOneAndUpdate(
-      { userId: this.tokenContent.sub },
-      { $push: { managers: newManagers } },
-      { new: true }
-    );
-
-    return updatedManager;
+    return updatedBusinesses;
   }
 
   public async addManagersByOwnerId(
     ownerId: string,
     managers: { id: string; role?: string }[]
   ): Promise<IManager | null> {
-    const targetManager = await ManagerModel.findOne({
+    const existingBusinesses = await ManagerModel.findOne({
       userId: ownerId,
     });
-    if (!targetManager) {
+    if (!existingBusinesses) {
       throw { status: 404, message: "Manager not found" };
     }
 
-    const existingManagerIds = targetManager.managers.map(
+    const existingManagerIds = existingBusinesses.managers.map(
       (manager) => manager.id
     );
     const newManagers = managers.filter(
@@ -132,14 +137,14 @@ class ManagerRepository {
   }
 
   public async removeManagers(managers: string[]): Promise<IManager | null> {
-    const targetManager = await ManagerModel.findOne({
+    const existingBusinesses = await ManagerModel.findOne({
       userId: this.tokenContent.sub,
     });
-    if (!targetManager) {
+    if (!existingBusinesses) {
       throw { status: 404, message: "Manager not found" };
     }
 
-    const isManagerExists = targetManager.managers.some((manager) =>
+    const isManagerExists = existingBusinesses.managers.some((manager) =>
       managers.includes(manager.id)
     );
     if (!isManagerExists) {
@@ -162,10 +167,10 @@ class ManagerRepository {
   }
 
   public async deleteManager(): Promise<IManager | null> {
-    const targetManager = await ManagerModel.findOne({
+    const existingBusinesses = await ManagerModel.findOne({
       userId: this.tokenContent.sub,
     });
-    if (!targetManager) {
+    if (!existingBusinesses) {
       throw { status: 404, message: "Manager not found" };
     }
 

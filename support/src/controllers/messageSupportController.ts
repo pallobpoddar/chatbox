@@ -9,6 +9,9 @@ import mongoose from "mongoose";
 import WhatsAppService from "@one.chat/shared/dist/services/whatsapp";
 import { IMessage } from "@one.chat/shared/dist/models/interfaces/message";
 import { MessageRepository } from "@one.chat/shared/dist/repositories/MessageRepository";
+import { queryValidator } from "../validators/QueryParams";
+import { ValidationErrorFormatter } from "../utils/ErrorFormatter";
+import { QueryToPagination } from "@one.chat/shared/dist/utils/ParamDecoder";
 
 class MessageSupportController {
   private metadata = generateMetadata("1.0.0", "manager");
@@ -28,6 +31,7 @@ class MessageSupportController {
 
   private setTokenContent(token: string) {
     this.messageSupportRepository.setTokenContent(token);
+    this.messageRepository.setTokenContent(token);
   }
 
   private setManualType(manualType: string | undefined) {
@@ -136,12 +140,8 @@ class MessageSupportController {
       const token = authInfo?.content;
       this.setTokenContent(token);
 
-      const { conversationIds } = req.body;
-
       const conversations =
-        await this.messageSupportRepository.getConversationsByIds(
-          conversationIds
-        );
+        await this.messageSupportRepository.getConversationsByIds();
 
       return ApiResponse.success(
         res,
@@ -162,18 +162,88 @@ class MessageSupportController {
     }
   }
 
+  async getAllConversationsByManagerId(req: Request, res: Response) {
+    try {
+      const authInfo = req.kauth?.grant?.access_token as any;
+      const token = authInfo?.content;
+      this.setTokenContent(token);
+
+      ValidationErrorFormatter(
+        queryValidator.validate(req.query, { abortEarly: false })
+      );
+
+      const pagination = QueryToPagination(req.query);
+
+      const conversations =
+        await this.messageSupportRepository.getAllConversationsByManagerId(
+          pagination.request.skip,
+          pagination.request.limit
+        );
+
+      return ApiResponse.success(
+        res,
+        { conversations },
+        "Conversations retrieved successfully",
+        undefined,
+        this.metadata
+      );
+    } catch (error: any) {
+      return ApiResponse.error(
+        res,
+        error.message,
+        error.status ?? 500,
+        error.errors,
+        this.metadata
+      );
+    }
+  }
+
   async getMessages(req: Request, res: Response) {
     try {
       const { conversationId } = req.params;
       const { page } = req.query;
       this.setTokenContent((req.kauth?.grant?.access_token as any).content);
-      const InboxChunk = await this.messageSupportRepository.getMessages(
+
+      const inboxChunks = await this.messageRepository.getMessages(
         conversationId,
         Number(page)
       );
+      const inboxChunkSupports =
+        await this.messageSupportRepository.getMessages(
+          conversationId,
+          Number(page)
+        );
+
+      let inboxChunkSupportMessages: any = {
+        conversationId: conversationId,
+        messages: [],
+      };
+
+      inboxChunks.forEach((inboxChunk) => {
+        inboxChunk.messages.forEach((chunkMessage) => {
+          let foundSupportMessage = null;
+
+          for (const supportChunk of inboxChunkSupports) {
+            foundSupportMessage = supportChunk.messages.find(
+              (supportMsg) =>
+                supportMsg.id.toString() === chunkMessage._id?.toString()
+            );
+
+            if (foundSupportMessage) break;
+          }
+
+          const combinedMessage = {
+            userPart: chunkMessage,
+            agentPart: foundSupportMessage ? foundSupportMessage : null,
+          };
+
+          inboxChunkSupportMessages.messages.push(combinedMessage);
+        });
+      });
+
       return ApiResponse.success(
         res,
-        { InboxChunk },
+        { inboxChunkSupportMessages },
         "Messages retrieved successfully",
         undefined,
         this.metadata

@@ -4,5 +4,4 @@ export interface IManager {
     id: string;
     role: string;
   }[];
-  isDeleted: boolean;
 }

@@ -42,7 +42,7 @@ supportRouter.post(
 supportRouter.post(
   "/managers/:userId",
   managerController.createManagerWithUserId.bind(managerController)
-)
+);
 
 supportRouter.get(
   "/manager",
@@ -62,7 +62,7 @@ supportRouter.patch(
 supportRouter.patch(
   "/managers/add/:ownerId",
   managerController.addManagersByOwnerId.bind(managerController)
-)
+);
 
 supportRouter.patch(
   "/managers/remove",
@@ -83,6 +83,13 @@ supportRouter.post(
 supportRouter.get(
   "/conversations",
   messageSupportController.getConversationsByIds.bind(messageSupportController)
+);
+
+supportRouter.get(
+  "/conversations/managers",
+  messageSupportController.getAllConversationsByManagerId.bind(
+    messageSupportController
+  )
 );
 
 supportRouter.get(

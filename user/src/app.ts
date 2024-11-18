@@ -3,8 +3,8 @@ import { SERVER_PORT } from "./config/config";
 import setupRoutes from "./routes/routes";
 import cors from "cors";
 import mongoose from "mongoose";
-import session from "express-session";
-import keycloak from "./setup/keycloak";
+import authMiddleware from "@one.chat/shared/dist/middleware/KeycloakAuth";
+import path from "path";
 
 require("dotenv").config();
 const mongodb = process.env.TEST_MONGODB_URL as string;
@@ -15,12 +15,23 @@ async function startServer() {
   app.use(express.json());
 
   app.use(cors());
+
+  console.log(
+    "static files are served from: ",
+    path.join(__dirname, "../../public/")
+  );
+
   app.use(
-    session({
-      secret: "secret",
-      resave: false,
-      saveUninitialized: true,
-      cookie: { secure: false },
+    "/public/uploads/",
+    express.static(path.join(__dirname, "../../public/uploads"), {
+      maxAge: "30d",
+    })
+  );
+
+  app.use(
+    "/public/downloads/",
+    express.static(path.join(__dirname, "../../public/downloads"), {
+      maxAge: "30d",
     })
   );
 
@@ -33,9 +44,7 @@ async function startServer() {
       console.error("Error connecting to MongoDB:", error);
     });
 
-  app.use(keycloak.middleware());
-
-  app.get("/", keycloak.protect(), async (req:any, res) => {
+  app.get("/", async (req: any, res) => {
     res.json(req.kauth?.grant?.access_token);
   });
 

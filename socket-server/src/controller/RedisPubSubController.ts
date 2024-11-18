@@ -28,4 +28,19 @@ export class RedisPubSubController {
       });
     }
   }
+
+  public async supportConversationChannelHandler(
+    namespace: Namespace,
+    channel: string,
+    message: string
+  ) {
+    if (channel !== "support-conversations") return;
+
+    const parsedMessage: IMessage = JSON.parse(message);
+    if (parsedMessage.conversation.supportParticipants?.length === 0) return;
+
+    parsedMessage.conversation.supportParticipants.map((participant) => {
+      namespace.to(`${participant}`).emit(channel, message);
+    });
+  }
 }

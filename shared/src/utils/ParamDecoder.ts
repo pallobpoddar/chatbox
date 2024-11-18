@@ -15,12 +15,10 @@ export const FilterParamsDecoder = (filters: string) => {
 
                 switch (operator) {
                     case 'eq':
-                        if (typeof value === 'string') {
-                            // Use regex for partial matching (LIKE in SQL)
-                            query[field] = { $regex: new RegExp(value, 'i') }; // 'i' for case-insensitive
-                        } else {
-                            query[field] = value;
-                        }
+                        query[field] = value;
+                        break;
+                    case 'like':
+                        query[field] = { $regex: new RegExp(value, 'i') };
                         break;
                     case 'gt':
                         query[field] = { $gt: value };
@@ -57,6 +55,23 @@ export const FilterParamsDecoder = (filters: string) => {
         throw { status: 400, message: "Bad Filter Format" };
     }
 };
+
+if (require.main === module) {
+    const data = [
+        [
+          "firstName",
+          "gt",
+          "imx"
+        ],
+        [
+          "lastName",
+          "eq",
+          "ppx"
+        ]
+    ]
+  
+    console.log(FilterParamsDecoder(JSON.stringify(data)))
+}
 
 
 

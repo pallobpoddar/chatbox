@@ -28,6 +28,7 @@ export class MessageRepository {
     this.manualType = manualType || undefined;
   }
 
+  // TODO: Distribution (socket)
   public async addMessage(
     conversationId: string,
     message: IMessage,
@@ -100,7 +101,7 @@ export class MessageRepository {
 
     const participantIds = conversation?.participants
       .filter((participant) => participant.id !== this.tokenContent.sub)
-      .map((participant) => participant.id);
+      .map((participant) => participant.id) as string[];
 
     const manager = await ManagerModel.findOne({
       userId: { $in: participantIds },
@@ -111,9 +112,42 @@ export class MessageRepository {
       conversations: { $elemMatch: { id: conversationId } },
     });
 
-    const distribution = await DistributionModel.findOne({
+    const distributions = await DistributionModel.find({
       assigns: { $elemMatch: { conversationId: conversationId } },
     });
+
+    const managers = await ManagerModel.find({
+      userId: { $in: participantIds },
+    });
+
+    const supportManagerIds = managers
+      .map((manager) => manager.managers.map((manager) => manager.id))
+      .flat();
+
+    const supportParticipants = [...participantIds, ...supportManagerIds];
+
+    const uniqueSupportManagerIds = [...new Set(supportParticipants)];
+
+    const supportConversation = {
+      ...conversation,
+      supportParticipants: uniqueSupportManagerIds,
+    };
+
+    console.log(supportConversation.supportParticipants);
+
+    (await this.redisClient).publish(
+      "conversations",
+      EventAction("sent", this.tokenContent?.sub, conversation, [
+        lastInboxChunk,
+      ])
+    );
+
+    (await this.redisClient).publish(
+      "support-conversations",
+      EventAction("sent", this.tokenContent?.sub, supportConversation, [
+        lastInboxChunk,
+      ])
+    );
 
     if (conversation?.pass) {
       (await this.redisClient).rpush(
@@ -129,14 +163,7 @@ export class MessageRepository {
       );
     }
 
-    (await this.redisClient).publish(
-      "conversations",
-      EventAction("sent", this.tokenContent?.sub, conversation, [
-        lastInboxChunk,
-      ])
-    );
-
-    if (manager && !pendingAssign && !distribution) {
+    if (manager && !pendingAssign && distributions.length === 0) {
       (await this.redisClient).rpush(
         "distribution:incoming",
         EventAction(
@@ -165,9 +192,10 @@ export class MessageRepository {
     const isAuthorized = targetConversation?.participants.some(
       (participant) => participant.id === this.tokenContent.sub
     );
-    if (!isAuthorized) {
-      throw { status: 403, message: "Permission denied" };
-    }
+
+    // if (!isAuthorized) {
+    //   throw { status: 403, message: "Permission denied" };
+    // }
 
     const targetParticipant = targetConversation?.participants.find(
       (participant) =>
@@ -180,7 +208,10 @@ export class MessageRepository {
     })
       .sort({ chunkSerial: -1 })
       .skip(page)
-      .limit(2);
+      .limit(2)
+      .lean();
+
+    lastInboxChunks.reverse();
 
     lastInboxChunks.map((chunk) => {
       chunk.messages = chunk.messages.filter((message) =>

@@ -1,11 +1,12 @@
-{
+
+  {
     "watch": [
-      "user"
+      "user","shared"
     ],
     "ignore": [
       "./node_modules",
       "./shared/dist/"
     ],
     "ext": "js,ts,json",
-    "exec": "ts-node ./user/src/app.ts"
+    "exec": "npm run build:shared && ts-node ./user/src/app.ts"
   }

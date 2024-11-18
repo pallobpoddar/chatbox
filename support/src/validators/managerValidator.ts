@@ -27,4 +27,36 @@ const managerValidator = Joi.object({
   isDeleted: Joi.boolean().default(false),
 });
 
-export default managerValidator;
+const addManagersValidator = Joi.object({
+  businessIds: Joi.array()
+    .items(
+      Joi.string()
+        .guid({ version: ["uuidv4"] })
+        .required()
+        .messages({
+          "string.guid": "Each business ID must be a valid UUID.",
+        })
+    )
+    .min(1)
+    .required()
+    .messages({
+      "array.min": "At least one business ID is required.",
+    }),
+
+  supportManagerId: Joi.string()
+    .guid({ version: ["uuidv4"] })
+    .required()
+    .messages({
+      "string.guid": "Support Manager ID must be a valid UUID.",
+    }),
+
+  role: Joi.string()
+    .valid("agent", "supervisor")
+    .default("agent")
+    .required()
+    .messages({
+      "any.only": 'Role must be either "agent" or "supervisor".',
+    }),
+});
+
+export { managerValidator, addManagersValidator };
